@@ -182,23 +182,26 @@ void eval(char *cmdline)
 			exit(0);
 			}
 		}
+	
 
 		if(!bg){
-			addjob(jobs, pid, FG, cmdline);
+			addjob(jobs,pid,FG,cmdline);
 			int status;
 			if (waitpid(pid, &status, 0)<0)
 				unix_error("waitfg: waitpid error");
 		}
-		 else {
-			addjob(jobs, pid, BG, cmdline);
+		if(bg){
+			addjob(jobs,pid,BG,cmdline);
 			printf("(%d) (%d) %s",FG,  pid, cmdline);
 		}
+
+		return;
 	}
-
-
-
-	return;
 }
+
+
+
+
 
 int builtin_cmd(char **argv)
 {
