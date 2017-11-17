@@ -183,20 +183,20 @@ void eval(char *cmdline)
 			}
 		}
 	
-
+			else{
 		if(!bg){
 			addjob(jobs,pid,FG,cmdline);
 			int status;
 			if (waitpid(pid, &status, 0)<0)
 				unix_error("waitfg: waitpid error");
 		}
-		if(bg){
+		else{
 			addjob(jobs,pid,BG,cmdline);
-			printf("(%d) (%d) %s",FG,  pid, cmdline);
+			printf("(%d) (%d) %s",1,  pid, cmdline);
 		}
-
-		return;
+			}
 	}
+	return;
 }
 
 
