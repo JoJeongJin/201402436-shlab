@@ -170,31 +170,33 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char *argv[MAXARGS];
+	char buf[MAXLINE];
 	int bg;
 	pid_t pid;
 
-	bg = parseline(cmdline, argv);
+	strcpy(buf,cmdline);
+	bg = parseline(buf, argv);
 
 	if(!builtin_cmd(argv)){
 			if((pid = fork())==0){
 			if((execve(argv[0], argv, environ)<0)){
-			printf("%s: Command not found.\n", argv);
+			printf("%s: Command not found.\n", argv[0]);
 			exit(0);
 			}
 		}
-	
-			else{
+
+				
 		if(!bg){
-			addjob(jobs,pid,FG,cmdline);
-			int status;
-			if (waitpid(pid, &status, 0)<0)
+			int status ;
+			int wait = waitpid(pid, &status, 0);
+			if (wait<0)
 				unix_error("waitfg: waitpid error");
 		}
-		else{
+		else if(bg){
 			addjob(jobs,pid,BG,cmdline);
-			printf("(%d) (%d) %s",1,  pid, cmdline);
+			printf("(%d) (%d) %s",pid2jid(pid),  pid, cmdline);
 		}
-			}
+			
 	}
 	return;
 }
