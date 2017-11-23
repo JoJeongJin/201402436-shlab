@@ -170,12 +170,22 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char *argv[MAXARGS];
-	char buf[MAXLINE];
 	int bg;
 	pid_t pid;
+	sigset_t mask;
 
-	strcpy(buf,cmdline);
-	bg = parseline(buf, argv);
+	bg = parseline(cmdline, argv);
+	if(sigemptyset(&mask)==0){
+		if(sigaddset(&mask,SIGINT)<0)
+			printf("SIGINT ERROR");
+		if(sigaddset(&mask,SIGCHLD)<0)
+			printf("SIGCHLD ERROR");
+		if(sigaddset(&mask, SIGTSTP)<0)
+			printf("SIGTSTP ERROR");
+	}
+
+	if(sigprocmask(SIG_BLOCK,&mask,NULL)<0)
+		unix_error("sigpromask SIGBLOC ERROR");
 
 	if(!builtin_cmd(argv)){
 			if((pid = fork())==0){
@@ -187,13 +197,16 @@ void eval(char *cmdline)
 
 				
 		if(!bg){
-			int status; 
-			int wait = waitpid(pid, &status, 0);
-			if (wait<0)
+			int status;
+			if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
+				printf("foreground SIGUNBLOCK Error");
+			if (waitpid(pid, &status, 0)<0)
 				unix_error("waitfg: waitpid error");
 		}
-		else if(bg){
+		else{
 			addjob(jobs,pid,BG,cmdline);
+			if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
+				printf("background SIGUNBLOCK Error");
 			printf("(%d) (%d) %s",pid2jid(pid),  pid, cmdline);
 		}
 			
