@@ -185,10 +185,12 @@ void eval(char *cmdline)
 	}
 
 	if(sigprocmask(SIG_BLOCK,&mask,NULL)<0)
-		unix_error("sigpromask SIGBLOC ERROR");
+		unix_error("sigpromask SIGBLOC Error");
 
 	if(!builtin_cmd(argv)){
 			if((pid = fork())==0){
+				if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
+					printf("fork SIGUNBLOCK Error");
 			if((execve(argv[0], argv, environ)<0)){
 			printf("%s: Command not found.\n", argv[0]);
 			exit(0);
@@ -198,10 +200,12 @@ void eval(char *cmdline)
 				
 		if(!bg){
 			int status;
+			addjob(jobs,pid,bg+1,cmdline);//
 			if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
 				printf("foreground SIGUNBLOCK Error");
 			if (waitpid(pid, &status, 0)<0)
 				unix_error("waitfg: waitpid error");
+		deletejob(jobs,pid);//
 		}
 		else{
 			addjob(jobs,pid,BG,cmdline);
