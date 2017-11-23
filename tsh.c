@@ -187,7 +187,7 @@ void eval(char *cmdline)
 
 				
 		if(!bg){
-			int status ;
+			int status; 
 			int wait = waitpid(pid, &status, 0);
 			if (wait<0)
 				unix_error("waitfg: waitpid error");
@@ -221,7 +221,22 @@ int builtin_cmd(char **argv)
 }
 
 void waitfg(pid_t pid, int output_fd)
-{
+{struct job_t *j = getjobpid(jobs, pid);
+	char buf[MAXLINE];
+
+	if(!j)
+		return;
+
+	while(j->pid==pid&&j->state==FG)
+		sleep(1);
+	if(verbose){
+		memset(buf, '\0', MAXLINE);
+		sprintf(buf, "waitfg: Process (%d) no longer the fg process:q\n", pid);
+		if(write(output_fd, buf, strlen(buf))<0){
+			fprintf(stderr, "Error writing to file\n");
+			exit(1);
+		}
+	}
 	return;
 }
 
@@ -238,6 +253,17 @@ void waitfg(pid_t pid, int output_fd)
  */
 void sigchld_handler(int sig) 
 {
+	pid_t wpid;
+	int child_status;
+	while((wpid=waitpid(-1, &child_status,0))>0){
+		if(WIFSIGNALED(child_status)){
+			printf("Job [%d] (%d) terminated by signal %d\n",pid2jid(wpid), wpid, WTERMSIG(child_status));
+		}else if(WIFEXITED(child_status)){
+			deletejob(jobs,wpid);
+		}else{
+			printf("waitpid error");
+		}
+	}
 	return;
 }
 
@@ -248,6 +274,12 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+	pid_t pid;
+	pid = fgpid(jobs);
+	if(pid>0){
+		if(kill(pid,SIGINT)<0)
+			printf("kill error");
+	}
 	return;
 }
 
