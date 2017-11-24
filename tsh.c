@@ -236,14 +236,13 @@ struct job_t *j;
 	if(!strcmp(cmd, "quit")){
 		exit(0);
 	}
-	//if(!strcmp(cmd,"&")){
-	//	return 1;
-	//}
+	if(!strcmp(cmd,"&")){
+		return 1;
+	}
     if(!strcmp(cmd, "jobs")){
 		listjobs(jobs,STDOUT_FILENO);
 		return 1;
 	}
-
 	if(!strcmp(cmd,"bg")){
 		if(argv[1][0]=='%'){
 			int jid = argv[1][1]-48;
@@ -254,6 +253,20 @@ struct job_t *j;
 			int pid = argv[1][0]-48;
 			j = getjobpid(jobs,pid);
 			j->state = BG;
+			kill(pid,SIGCONT);
+		}printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
+		return 1;
+	}
+	if(!strcmp(cmd,"fg")){
+		if(argv[1][0]=='%'){
+			int jid = argv[1][1]-48;
+			j = getjobjid(jobs,jid);
+			j->state=FG;
+			kill(j->pid,SIGCONT);
+		}else{
+			int pid = argv[1][0] - 48;
+			j=getjobpid(jobs,pid);
+			j->state = FG;
 			kill(pid,SIGCONT);
 		}printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
 		return 1;
@@ -308,7 +321,7 @@ void sigchld_handler(int sig)
 		else if(WIFSTOPPED(status)){
 			child_jid = pid2jid(child_pid);
 			j->state = ST;
-			fprintf(stdout, "Job [%d] (%d) stopped by signal%d\n", child_jid, child_pid, WSTOPSIG(status));
+			fprintf(stdout, "Job [%d] (%d) stopped by signal %d\n", child_jid, child_pid, WSTOPSIG(status));
 		}
 		else if(WIFSIGNALED(status)){
 			child_jid = pid2jid(child_pid);
