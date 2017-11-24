@@ -231,15 +231,31 @@ void eval(char *cmdline)
 int builtin_cmd(char **argv)
 {
 	char *cmd = argv[0];
+struct job_t *j;
 
 	if(!strcmp(cmd, "quit")){
 		exit(0);
 	}
-	if(!strcmp(cmd,"&")){
-		return 1;
-	}
+	//if(!strcmp(cmd,"&")){
+	//	return 1;
+	//}
     if(!strcmp(cmd, "jobs")){
 		listjobs(jobs,STDOUT_FILENO);
+		return 1;
+	}
+
+	if(!strcmp(cmd,"bg")){
+		if(argv[1][0]=='%'){
+			int jid = argv[1][1]-48;
+			j = getjobjid(jobs,jid);
+			j->state = BG;
+			kill(j->pid,SIGCONT);
+		}else{
+			int pid = argv[1][0]-48;
+			j = getjobpid(jobs,pid);
+			j->state = BG;
+			kill(pid,SIGCONT);
+		}printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
 		return 1;
 	}
 	
