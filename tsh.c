@@ -170,51 +170,61 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char *argv[MAXARGS];
-	int bg;
 	pid_t pid;
+	int bg;
 	sigset_t mask;
 
 	bg = parseline(cmdline, argv);
-	if(sigemptyset(&mask)==0){
-		if(sigaddset(&mask,SIGINT)<0)
-			printf("SIGINT ERROR");
-		if(sigaddset(&mask,SIGCHLD)<0)
-			printf("SIGCHLD ERROR");
-		if(sigaddset(&mask, SIGTSTP)<0)
-			printf("SIGTSTP ERROR");
-	}
-
-	if(sigprocmask(SIG_BLOCK,&mask,NULL)<0)
-		unix_error("sigpromask SIGBLOC Error");
+	
 
 	if(!builtin_cmd(argv)){
-			if((pid = fork())==0){
-				if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
-					printf("fork SIGUNBLOCK Error");
-			if((execve(argv[0], argv, environ)<0)){
-			printf("%s: Command not found.\n", argv[0]);
-			exit(0);
-			}
-		}
+		if(sigemptyset(&mask)<0)
+			unix_error("sigemptyseterror");
+		if(sigaddset(&mask,SIGCHLD))
+			unix_error("sigaddset error");
+		if(sigaddset(&mask,SIGINT))
+			unix_error("sigaddset error");
+		if(sigaddset(&mask,SIGTSTP))
+			unix_error("sigaddset error");
 
-				
+		if(sigprocmask(SIG_BLOCK, &mask, NULL)<0)
+			unix_error("SIGprocmask error");
+
+		if((pid=fork())==0){
+			if(sigprocmask(SIG_UNBLOCK,&mask,NULL)<0)
+				unix_error("sigprocmask 'SIG_UNBLOCK error");
+			if(setpgid(0,0)<0)
+				unix_error("setpid error");
+			if(execve(argv[0], argv, environ)<0){
+				printf("%s: Command not found.\n",argv[0]);
+				exit(0);
+			}
+		}//자식 프로세서를 종료하지 않았을때 
+		else if(pid<0)
+				unix_error("fork error");
+
+		
 		if(!bg){
 			int status;
-			addjob(jobs,pid,bg+1,cmdline);//
-			if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
-				printf("foreground SIGUNBLOCK Error");
-			if (waitpid(pid, &status, 0)<0)
-				unix_error("waitfg: waitpid error");
-		deletejob(jobs,pid);//
+			addjob(jobs,pid,FG,cmdline);
+			if(sigprocmask(SIG_UNBLOCK,&mask,NULL)<0)
+				printf("foreground SIG_UNBLOCK ERROR");
+			waitfg(pid,1);
+			//if (waitpid(pid, &status, 0)<0){
+			//	unix_error("waitpid error");}
 		}
 		else{
-			addjob(jobs,pid,BG,cmdline);
-			if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
-				printf("background SIGUNBLOCK Error");
+			if(!addjob(jobs,pid,BG,cmdline))
+				return;
+			//if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
+				//printf("background SIGUNBLOCK Error");
 			printf("(%d) (%d) %s",pid2jid(pid),  pid, cmdline);
+			if(sigprocmask(SIG_UNBLOCK,&mask,NULL)<0)
+				unix_error("background SIG_UNBLOCK ERROR");
 		}
+	 }
 			
-	}
+	
 	return;
 }
 
@@ -228,6 +238,9 @@ int builtin_cmd(char **argv)
 
 	if(!strcmp(cmd, "quit")){
 		exit(0);
+	}
+	if(!strcmp(cmd,"&")){
+		return 1;
 	}
     if(!strcmp(cmd, "jobs")){
 		listjobs(jobs,STDOUT_FILENO);
@@ -270,19 +283,55 @@ void waitfg(pid_t pid, int output_fd)
  */
 void sigchld_handler(int sig) 
 {
-	pid_t wpid;
+	pid_t child_pid;
+	int child_jid;
+	int status;
+
+	while((child_pid = waitpid(-1,&status, WNOHANG|WUNTRACED))>0){
+		struct job_t *j = getjobpid(jobs,child_pid);
+
+		if(!j){
+			return;
+		}
+		else if(WIFSTOPPED(status)){
+			child_jid = pid2jid(child_pid);
+			j->state = ST;
+			fprintf(stdout, "Job [%d] (%d) stopped by signal%d\n", child_jid, child_pid, WSTOPSIG(status));
+		}
+		else if(WIFSIGNALED(status)){
+			child_jid = pid2jid(child_pid);
+			fprintf(stdout, "Job [%d] (%d) terminated by signal %d\n", child_jid, child_pid, WTERMSIG(status));
+			deletejob(jobs,child_pid);
+		}
+		else if(WIFEXITED(status)){
+			deletejob(jobs,child_pid);
+		}
+		else
+			unix_error("waitpid error");
+	}
+	return;
+}
+
+	/*while((pid=waitpid(fgpid(jobs),&status,0))>0){
+		if(WIFSIGNALED(status)){
+			int sid = pid2jid(pid);
+			printf("Job [%d] (%d) terminated by signal %d\n", sid, pid, WTERMSIG(status));
+			deletejob(jobs,pid);
+		}
+	}*/
+	/*pid_t wpid;
 	int child_status;
 	while((wpid=waitpid(-1, &child_status,0))>0){
 		if(WIFSIGNALED(child_status)){
-			printf("Job [%d] (%d) terminated by signal %d\n",pid2jid(wpid), wpid, WTERMSIG(child_status));
+			printf("Job [%d] (%d) terminated by signal %d\n",pid2jid(wpid),wpid, WTERMSIG(child_status));
 		}else if(WIFEXITED(child_status)){
 			deletejob(jobs,wpid);
 		}else{
 			printf("waitpid error");
 		}
-	}
-	return;
-}
+	}*/
+//	return;
+//}
 
 /* 
  * sigint_handler - The kernel sends a SIGINT to the shell whenver the
@@ -291,12 +340,15 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-	pid_t pid;
+/*pid_t pid;
 	pid = fgpid(jobs);
 	if(pid>0){
 		if(kill(pid,SIGINT)<0)
 			printf("kill error");
-	}
+	}*/
+	pid_t pid = fgpid(jobs);
+	if(kill(pid,SIGINT)<0)
+		printf("sigIntError");
 	return;
 }
 
