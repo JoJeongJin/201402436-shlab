@@ -210,14 +210,10 @@ void eval(char *cmdline)
 			if(sigprocmask(SIG_UNBLOCK,&mask,NULL)<0)
 				printf("foreground SIG_UNBLOCK ERROR");
 			waitfg(pid,1);
-			//if (waitpid(pid, &status, 0)<0){
-			//	unix_error("waitpid error");}
 		}
 		else{
 			if(!addjob(jobs,pid,BG,cmdline))
 				return;
-			//if(sigprocmask(SIG_UNBLOCK, &mask, NULL)<0)
-				//printf("background SIGUNBLOCK Error");
 			printf("(%d) (%d) %s",pid2jid(pid),  pid, cmdline);
 			if(sigprocmask(SIG_UNBLOCK,&mask,NULL)<0)
 				unix_error("background SIG_UNBLOCK ERROR");
@@ -312,27 +308,6 @@ void sigchld_handler(int sig)
 	return;
 }
 
-	/*while((pid=waitpid(fgpid(jobs),&status,0))>0){
-		if(WIFSIGNALED(status)){
-			int sid = pid2jid(pid);
-			printf("Job [%d] (%d) terminated by signal %d\n", sid, pid, WTERMSIG(status));
-			deletejob(jobs,pid);
-		}
-	}*/
-	/*pid_t wpid;
-	int child_status;
-	while((wpid=waitpid(-1, &child_status,0))>0){
-		if(WIFSIGNALED(child_status)){
-			printf("Job [%d] (%d) terminated by signal %d\n",pid2jid(wpid),wpid, WTERMSIG(child_status));
-		}else if(WIFEXITED(child_status)){
-			deletejob(jobs,wpid);
-		}else{
-			printf("waitpid error");
-		}
-	}*/
-//	return;
-//}
-
 /* 
  * sigint_handler - The kernel sends a SIGINT to the shell whenver the
  *    user types ctrl-c at the keyboard.  Catch it and send it along
@@ -340,12 +315,7 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-/*pid_t pid;
-	pid = fgpid(jobs);
-	if(pid>0){
-		if(kill(pid,SIGINT)<0)
-			printf("kill error");
-	}*/
+
 	pid_t pid = fgpid(jobs);
 	if(kill(pid,SIGINT)<0)
 		printf("sigIntError");
@@ -359,6 +329,9 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+	pid_t pid;
+	pid = fgpid(jobs);
+	kill(-pid,SIGTSTP);
 	return;
 }
 
