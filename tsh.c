@@ -257,7 +257,7 @@ struct job_t *j;
 		}printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
 		return 1;
 	}
-	if(!strcmp(cmd,"fg")){
+	if(!strcmp(cmd,"fg")){	
 		if(argv[1][0]=='%'){
 			int jid = argv[1][1]-48;
 			j = getjobjid(jobs,jid);
@@ -268,7 +268,7 @@ struct job_t *j;
 			j=getjobpid(jobs,pid);
 			j->state = FG;
 			kill(pid,SIGCONT);
-		}printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
+		}
 		return 1;
 	}
 	
