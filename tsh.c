@@ -190,6 +190,7 @@ void eval(char *cmdline)
 		if(sigprocmask(SIG_BLOCK, &mask, NULL)<0)
 			unix_error("SIGprocmask error");
 
+		
 		if((pid=fork())==0){
 			if(sigprocmask(SIG_UNBLOCK,&mask,NULL)<0)
 				unix_error("sigprocmask 'SIG_UNBLOCK error");
